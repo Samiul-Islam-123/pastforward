@@ -2,7 +2,6 @@
 let world;
 let player;
 let ghost;
-let enemies = [];
 let physics;
 let controller;
 let gravityVector;
@@ -20,46 +19,43 @@ let gameSpeed = 3; // Slower initial speed
 let lastObstacleTime = 0;
 let lastCoinTime = 0;
 let ghostProximity = 0; // How close the ghost is to the player (0-100)
-let lastEnemyTime = 0;
 
 // Timing
 let lastTime = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  
+
   // Initialize game systems
   world = new World();
   gravityVector = createVector(0, 0.5);
-  player = new Player(100, height/2, 10);
-  ghost = new Ghost(0, height/2);
+  player = new Player(100, height / 2, 25);
+  ghost = new Ghost(0, height / 2);
   controller = new Controller(player);
   physics = new Physics();
-  
+
   // Create initial ground
   createInitialLands();
-  
-  // Create initial enemies
-  createInitialEnemies();
-  
+
   // Set frame rate for consistent timing
   frameRate(60);
 }
 
 function createInitialLands() {
-  // Create initial ground platforms
-  lands.push(new Land(20, width * 2, { x: 0, y: height - 20 }));
-  
-  // Create some initial platforms
-  lands.push(new Land(15, 200, { x: 400, y: height - 150 }));
-  lands.push(new Land(15, 150, { x: 700, y: height - 200 }));
-  lands.push(new Land(15, 180, { x: 1000, y: height - 250 }));
-}
+  // Create initial ground platforms (multiple shorter platforms)
+  let platformCount = 5;
+  let platformWidth = width / platformCount;
 
-function createInitialEnemies() {
-  // Create initial enemies
-  enemies.push(new Enemy(300, height/2));
-  enemies.push(new Enemy(600, height/3));
+  for (let i = 0; i < platformCount; i++) {
+    lands.push(new Land(20, platformWidth - 20, { x: i * platformWidth, y: height - 90 }));
+  }
+
+  // Create some initial platforms
+  // lands.push(new Land(15, 150, { x: 300, y: height - 150 }));
+  // lands.push(new Land(15, 120, { x: 500, y: height - 200 }));
+  // lands.push(new Land(15, 180, { x: 700, y: height - 250 }));
+  // lands.push(new Land(15, 100, { x: 900, y: height - 180 }));
+  // lands.push(new Land(15, 160, { x: 1100, y: height - 220 }));
 }
 
 function draw() {
@@ -67,34 +63,33 @@ function draw() {
     showGameOverScreen();
     return;
   }
-  
+
   // Draw world background
   world.createWorld();
-  
+
   // Update game systems
   controller.update();
   physics.applyGravity(player, gravityVector);
   player.updatePlayer();
-  
+
   // Update ghost
   ghost.updateGhost(player.pos);
-  
+
   // Generate new obstacles and coins
   generateObstacles();
   generateCoins();
-  generateEnemies();
-  
+
   // Generate new platforms to ensure player always has somewhere to land
   world.generatePlatforms(lands);
-  
+
   // Reset onGround status before checking collisions
   player.onGround = false;
-  
+
   // Update and draw lands
   for (let i = lands.length - 1; i >= 0; i--) {
     lands[i].updateLand(world.getScrollSpeed());
     lands[i].createLand();
-    
+
     // Remove offscreen lands
     if (lands[i].isOffscreen()) {
       lands.splice(i, 1);
@@ -105,45 +100,32 @@ function draw() {
       }
     }
   }
-  
-  // Update and draw enemies
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    enemies[i].updateEnemy(player.pos);
-    enemies[i].showEnemy();
-    
-    // Check collision with player
-    if (physics.checkEnemyCollision(player, enemies[i])) {
-      // Player hit by enemy - ghost gets closer
-      ghostProximity = min(ghostProximity + 15, 100);
-      // Reset enemy position
-      enemies[i].reset(width + 100, random(100, height - 100));
-    }
-  }
-  
+
   // Update and draw obstacles
   for (let i = obstacles.length - 1; i >= 0; i--) {
     obstacles[i].updateObstacle(world.getScrollSpeed());
     obstacles[i].showObstacle();
-    
+
     // Check collision
     if (obstacles[i].collidesWith(player)) {
-      // Player hit obstacle - ghost gets closer
       ghostProximity = min(ghostProximity + 10, 100);
+      ghost.moveCloser(); // 👻 Ghost moves nearer instead of increasing speed
       obstacles.splice(i, 1);
       continue;
     }
-    
+
+
     // Remove offscreen obstacles
     if (obstacles[i].isOffscreen()) {
       obstacles.splice(i, 1);
     }
   }
-  
+
   // Update and draw coins
   for (let i = coins.length - 1; i >= 0; i--) {
     coins[i].updateCoin(world.getScrollSpeed());
     coins[i].showCoin();
-    
+
     // Check collection
     if (coins[i].collidesWith(player)) {
       if (coins[i].collect()) {
@@ -153,32 +135,36 @@ function draw() {
         continue;
       }
     }
-    
+
     // Remove offscreen or collected coins
     if (coins[i].isOffscreen() || coins[i].collected) {
       coins.splice(i, 1);
     }
   }
-  
+
   // Draw player
   player.showPlayer();
-  
+
   // Draw ghost
   ghost.showGhost();
-  
+
   // Check ghost collision
   if (physics.checkGhostCollision(player, ghost)) {
     gameOver = true;
   }
-  
+
+
+  if (player.pos.y > height + 40)
+    gameOver = true;
+
   // Increase difficulty over time
   if (frameCount % 1200 === 0) { // Every 20 seconds (slower increase)
     world.increaseSpeed(0.1);
   }
-  
+
   // Update score
   score += 0.05; // Slower score increase
-  
+
   // Draw UI
   drawUI();
 }
@@ -189,8 +175,8 @@ function generateObstacles() {
     if (random() < 0.2) { // 20% chance to generate obstacle
       let obstacleType = random() > 0.5 ? "wall" : "spike";
       let height = obstacleType === "wall" ? random(50, 150) : 30;
-      let y = obstacleType === "wall" ? height/2 : height - 15;
-      
+      let y = obstacleType === "wall" ? height / 2 : height - 15;
+
       obstacles.push(new Obstacle(
         width + 20,
         height - y,
@@ -198,7 +184,7 @@ function generateObstacles() {
         height,
         obstacleType
       ));
-      
+
       lastObstacleTime = frameCount;
     }
   }
@@ -210,31 +196,10 @@ function generateCoins() {
     if (random() < 0.3) { // 30% chance to generate coin
       coins.push(new Coin(
         width + 20,
-        random(height/2, height - 50)
+        random(height / 2, height - 50)
       ));
-      
-      lastCoinTime = frameCount;
-    }
-  }
-}
 
-function generateEnemies() {
-  // Generate enemies randomly
-  if (frameCount - lastEnemyTime > 300) { // Roughly every 5 seconds
-    if (random() < 0.3) { // 30% chance to generate enemy
-      enemies.push(new Enemy(
-        width + 20,
-        random(100, height - 100)
-      ));
-      
-      lastEnemyTime = frameCount;
-    }
-  }
-  
-  // Remove enemies that are too far behind
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    if (enemies[i].pos.x < -100) {
-      enemies.splice(i, 1);
+      lastCoinTime = frameCount;
     }
   }
 }
@@ -246,16 +211,16 @@ function drawUI() {
   textAlign(LEFT, TOP);
   text("Score: " + Math.floor(score), 20, 20);
   text("Coins: " + coinsCollected, 20, 50);
-  
+
   // Ghost proximity indicator
   fill(255);
   textSize(16);
   text("Ghost Proximity:", 20, height - 60);
-  
+
   // Proximity bar
   fill(50);
   rect(20, height - 40, 200, 20);
-  
+
   // Fill based on proximity
   if (ghostProximity < 50) {
     fill(0, 255, 0); // Green
@@ -264,30 +229,30 @@ function drawUI() {
   } else {
     fill(255, 0, 0); // Red
   }
-  
+
   rect(20, height - 40, map(ghostProximity, 0, 100, 0, 200), 20);
-  
+
   // Dash cooldown indicator
   fill(255);
   textSize(14);
   text("Dash Cooldown:", 20, height - 80);
-  
+
   fill(50);
   rect(20, height - 70, 100, 10);
-  
+
   if (player.dashCooldown <= 0) {
     fill(0, 255, 0);
   } else {
     fill(255, 0, 0);
   }
-  
+
   let cooldownWidth = map(player.dashCooldown, 45, 0, 0, 100);
   rect(20, height - 70, cooldownWidth, 10);
-  
+
   // Controls help
   fill(200);
   textSize(12);
-  text("Controls: W/S - Jump/Duck, A/D - Dash, R - Restart", width/2, 20);
+  text("Controls: W/S - Jump/Duck, A/D - Dash, R - Restart", width / 2, 20);
 }
 
 function showGameOverScreen() {
@@ -295,14 +260,14 @@ function showGameOverScreen() {
   fill(255);
   textSize(48);
   textAlign(CENTER, CENTER);
-  text("GAME OVER", width/2, height/2 - 50);
-  
+  text("GAME OVER", width / 2, height / 2 - 50);
+
   textSize(24);
-  text("Final Score: " + Math.floor(score), width/2, height/2);
-  text("Coins Collected: " + coinsCollected, width/2, height/2 + 40);
-  
+  text("Final Score: " + Math.floor(score), width / 2, height / 2);
+  text("Coins Collected: " + coinsCollected, width / 2, height / 2 + 40);
+
   textSize(18);
-  text("Press R to Restart", width/2, height/2 + 100);
+  text("Press R to Restart", width / 2, height / 2 + 100);
 }
 
 function keyPressed() {
@@ -310,14 +275,14 @@ function keyPressed() {
   if ((keyCode === UP_ARROW || key === 'w' || key === 'W') && !player.isDucking) {
     player.jump(controller.jumpForce);
   }
-  
+
   // Handle dashing
   if (key === 'a' || key === 'A') {
-    controller.dash(-1); // Dash left
+    controller.dash(-1, windowWidth); // Dash left
   } else if (key === 'd' || key === 'D') {
-    controller.dash(1); // Dash right
+    controller.dash(1, windowWidth); // Dash right
   }
-  
+
   // Restart game
   if (key === 'r' || key === 'R') {
     restartGame();
@@ -333,25 +298,22 @@ function restartGame() {
   gameSpeed = 3; // Reset to slower speed
   obstacles = [];
   coins = [];
-  enemies = [];
-  
+
   // Reset player
-  player.pos.set(100, height/2);
+  player.pos.set(100, height / 2);
   player.velocity.set(0, 0);
   player.acceleration.set(0, 0);
   player.onGround = false;
   player.stand();
-  
+
   // Reset ghost
-  ghost.pos.set(0, height/2);
-  
+  ghost.pos.set(0, height / 2);
+  ghost.resetSpeed(); // Reset ghost speed
+
   // Reset world
   world = new World();
-  
+
   // Recreate initial lands
   lands = [];
   createInitialLands();
-  
-  // Recreate initial enemies
-  createInitialEnemies();
 }

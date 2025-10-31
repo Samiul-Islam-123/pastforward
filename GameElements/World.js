@@ -1,57 +1,99 @@
-class World{
-    constructor(){
-        this.groundHeight = 20;
-        this.scrollSpeed = 3; // Slower initial speed
-        this.lastPlatformTime = 0;
+class World {
+  constructor() {
+    this.groundHeight = 20;
+    this.scrollSpeed = 4;
+    this.lastPlatformTime = 0;
+    this.bats = this.createBats(6); // 🦇 flying bats
+  }
+
+  createWorld() {
+    // 🌑 Dark purple Halloween sky gradient
+    for (let y = 0; y < height; y++) {
+      let inter = map(y, 0, height, 0, 1);
+      let c = lerpColor(color(15, 10, 30), color(60, 20, 40), inter);
+      stroke(c);
+      line(0, y, width, y);
     }
 
-    createWorld(){
-        background(50, 50, 100); // Dark blue background
-        
-        // Draw some stars for atmosphere
-        fill(255, 255, 200);
-        noStroke();
-        for (let i = 0; i < 50; i++) {
-            let x = (frameCount * 0.5 + i * 50) % (width + 100);
-            let y = (sin(frameCount * 0.02 + i) * 30) + 50;
-            ellipse(x, y, 2, 2);
+    noStroke();
+
+    // 🌕 Glowing moon
+    let moonX = width - 150;
+    let moonY = 100;
+    for (let r = 80; r > 0; r -= 5) {
+      fill(255, 255, 200, map(r, 80, 0, 10, 255));
+      ellipse(moonX, moonY, r * 2);
+    }
+
+    // ✨ Flickering stars
+    for (let i = 0; i < 60; i++) {
+      let x = (frameCount * 0.2 + i * 60) % (width + 100);
+      let y = (sin(frameCount * 0.03 + i) * 40) + 60;
+      let flicker = random(180, 255);
+      fill(flicker, flicker, 220);
+      ellipse(x, y, random(1, 3));
+    }
+
+    // 🦇 Flying bats
+    for (let bat of this.bats) {
+      bat.update();
+      bat.show();
+    }
+  }
+
+  getScrollSpeed() {
+    return this.scrollSpeed;
+  }
+
+  increaseSpeed(amount) {
+    this.scrollSpeed += amount;
+  }
+
+  // 🎃 Generate platforms near bottom
+  generatePlatforms(lands) {
+    if (frameCount - this.lastPlatformTime > 60) {
+      let rightmostX = 0;
+      for (let land of lands) {
+        if (land.pos.x + land.width > rightmostX) {
+          rightmostX = land.pos.x + land.width;
         }
+      }
+
+      if (rightmostX < width + 400) {
+        let platformWidth = random(250, 400);
+        let thickness = random(20, 25);
+        let x = rightmostX + random(40, 80);
+        let y = random(height - 120, height - 60);
+        y = constrain(y, height - 140, height - 60);
+
+        let newLand = new Land(thickness, platformWidth, { x: x, y: y });
+        lands.push(newLand);
+
+        this.generateObstacleOnLand(newLand);
+        this.lastPlatformTime = frameCount;
+      }
     }
-    
-    getScrollSpeed() {
-        return this.scrollSpeed;
+  }
+
+  // 🧱 Obstacle grounded on platform
+  generateObstacleOnLand(land) {
+    if (random() < 0.5) {
+      let obstacleType = random() > 0.5 ? "wall" : "spike";
+      let obstacleWidth = random(30, 50);
+      let obstacleHeight = obstacleType === "wall" ? random(60, 120) : 30;
+      let obstacleX = land.pos.x + random(30, land.width - obstacleWidth - 30);
+      let obstacleY = land.pos.y - obstacleHeight;
+      if (obstacleY < height - 250) obstacleY = height - 250;
+      obstacles.push(new Obstacle(obstacleX, obstacleY, obstacleWidth, obstacleHeight, obstacleType));
     }
-    
-    increaseSpeed(amount) {
-        this.scrollSpeed += amount;
+  }
+
+  // 🦇 Create a few bat objects
+  createBats(count) {
+    let bats = [];
+    for (let i = 0; i < count; i++) {
+      bats.push(new Bat(random(width), random(50, 200), random(1, 2)));
     }
-    
-    // Generate new platforms as old ones move off screen
-    generatePlatforms(lands) {
-        // Generate new platforms periodically
-        if (frameCount - this.lastPlatformTime > 60) { // Every second at 60fps
-            // Find the rightmost platform
-            let rightmostX = 0;
-            for (let land of lands) {
-                if (land.pos.x + land.width > rightmostX) {
-                    rightmostX = land.pos.x + land.width;
-                }
-            }
-            
-            // Only generate if we need more platforms
-            if (rightmostX < width + 500) {
-                // Create a new platform
-                let width = random(100, 300);
-                let thickness = random(15, 25);
-                let x = rightmostX + random(50, 150);
-                let y = random(height - 300, height - 50);
-                
-                // Ensure platform isn't too high or low
-                y = constrain(y, height - 300, height - 50);
-                
-                lands.push(new Land(thickness, width, { x: x, y: y }));
-                this.lastPlatformTime = frameCount;
-            }
-        }
-    }
+    return bats;
+  }
 }

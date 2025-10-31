@@ -47,17 +47,19 @@ class Player {
     duck() {
         this.isDucking = true;
         // Make player smaller when ducking
-        this.radius = 7;
+        this.radius = 15;
+        this.pos.y -= 5;
     }
     
     stand() {
         this.isDucking = false;
-        this.radius = 10;
+        this.radius = 25;
     }
     
-    dash(direction) {
-        if (this.dashCooldown <= 0) {
-            this.velocity.x += direction * 10; // Reduced dash power
+    dash(direction, screenWidth) {
+        // Only allow dash if player is within the screen bounds
+        if (this.dashCooldown <= 0 && this.pos.x >= 0 && this.pos.x <= screenWidth) {
+            this.velocity.x += direction * 20; // Reduced dash power
             this.dashCooldown = 45; // Longer cooldown
         }
     }
